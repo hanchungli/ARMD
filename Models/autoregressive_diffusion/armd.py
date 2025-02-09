@@ -51,6 +51,7 @@ class ARMD(nn.Module):
             eta=0.,
             attn_pd=0.,
             resid_pd=0.,
+            w_grad=True,
             **kwargs
     ):
         super(ARMD, self).__init__()
@@ -59,7 +60,7 @@ class ARMD(nn.Module):
         self.seq_length = seq_length
         self.feature_size = feature_size
 
-        self.model = Linear(n_feat=feature_size, n_channel=seq_length, **kwargs)
+        self.model = Linear(n_feat=feature_size, n_channel=seq_length, w_grad=w_grad, **kwargs)
 
         if beta_schedule == 'linear':
             betas = linear_beta_schedule(timesteps)

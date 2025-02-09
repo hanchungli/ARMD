@@ -32,6 +32,7 @@ class Linear(nn.Module):
         self,
         n_feat,
         n_channel,
+        w_grad=True,
         **kwargs
     ):
         super().__init__()
@@ -41,7 +42,7 @@ class Linear(nn.Module):
         self.alphas = 1. - self.betas
         self.alphas_cumprod = torch.cumprod(self.alphas, dim=0)
         self.alphas_dev = 1. - self.betas_dev
-        self.w = torch.nn.Parameter(torch.FloatTensor(self.alphas_cumprod.numpy()), requires_grad=True)
+        self.w = torch.nn.Parameter(torch.FloatTensor(self.alphas_cumprod.numpy()), requires_grad=w_grad)
         self.w_dev = torch.nn.Parameter(torch.FloatTensor(self.alphas_dev.numpy()), requires_grad=False)
 
     def forward(self, input_, t, training=True):
@@ -52,6 +53,12 @@ class Linear(nn.Module):
         x_tmp = self.linear(input_.permute(0,2,1)).permute(0,2,1)
         alpha = self.w[t[0]]
         output = (alpha*input_ + (1-2*alpha)*x_tmp) / (1-1*alpha)**(1/2)
+        #if not training:
+            #print('alpha:',alpha)
+            #print('para:',1-1*alpha)
+            #print('dis:',x_tmp.mean())
+            #print('loss:',((1-1*alpha)*x_tmp).mean())
+
         output = output.to(torch.float32)
 
         return output
