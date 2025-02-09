@@ -22,7 +22,7 @@ The datasets (ETT, Solar Energy and Exchange) can be obtain from (https://github
 For training & Sampling, you can run:
 
 ~~~bash
-python main.py
+python main.py --config_path ./Config/etth1.yaml
 ~~~
 
 **Note:** We provide the corresponding `.yaml` files under the folder `./Config` where all possible options can be altered. You may need to change some hyper-parameters in the model for different forecasting scenarios.
