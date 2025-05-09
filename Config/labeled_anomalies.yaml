@@ -1,71 +1,56 @@
 # labeled_anomalies.yaml
+# 基于ARMD模型和标注异常数据的完整配置
 
-# 继承基础模型配置
+# 继承基础模型参数
 _base_: etth1.yaml
 
-# 数据集重定义
-dataloader:
-  train_dataset:
-    params:
-      # 强制覆盖数据路径为带标注的ETTh1
-      data_root: ./ETTh1.csv
-      # 新增异常标注加载模块
-      anomaly_annotation_path: ./labeled_anomalies.csv
-      # 增强数据预处理流程
-      preprocessor:
-        name: AnnotatedNormalizer
-        params:
-          norm_method: neg_one_to_one
-          anomaly_handling: mask  # 对标注异常区域进行掩码
-          mask_value: -999  # 特殊值标记异常
+# 数据配置增强
+dataset:
+  name: ETTh1_Anomaly
+  data_path: ./Data/datasets/ETTh1.csv
+  anomaly_labels_path: ./Data/datasets/labeled_anomalies.csv
+  feature_columns: ["HUFL", "HULL", "MUFL", "MULL", "LUFL", "LULL", "OT"]
+  anomaly_label_column: "anomaly_flag"  # 新增异常标记列
 
-# 模型调优参数
+# 模型架构调整
 model:
+  target: Models.autoregressive_diffusion.armd.ARMD
   params:
-    # 扩展模型输入维度以包含异常标记
-    feature_size: 8  # 原始7维特征 + 1维异常标记
-    # 新增异常感知损失权重
-    anomaly_loss_weight: 0.3
-    # 调整扩散步长适配异常检测
-    timesteps: 128  # 原始96步扩展
+    seq_length: 96
+    feature_size: 8  # 原始7特征 + 1异常标记
+    anomaly_aware: True
+    attention_mask: True  # 启用异常区域注意力掩码
 
-# 训练策略优化
-solver:
-  # 降低学习率避免异常区域过拟合
-  base_lr: 5.0e-4
-  # 新增异常敏感的学习率调度
-  scheduler:
-    params:
-      anomaly_patience: 200  # 当检测到异常模式时提前降低学习率
+# 训练流程优化
+trainer:
+  batch_size: 64
+  max_epochs: 1000
+  gradient_accumulation_steps: 2
+  anomaly_weight: 0.7  # 异常区域损失权重
 
-# 异常评估模块
-evaluation:
+  checkpoint:
+    dir: ./anomaly_checkpoints
+    save_every: 100
+
+# 异常处理模块
+anomaly_processor:
+  preprocess:
+    - method: normalize
+      range: [-1, 1]
+    - method: label_injection  # 注入标注异常信息
+      source: labeled_anomalies.csv
+      field_mapping:
+        chan_id: channel
+        spacecraft: source_system
+        anomaly_sequences: anomaly_windows
+
+# 评估配置
+evaluator:
   metrics:
-    - name: anomaly_f1
-      type: pointwise  # 逐点评估
-      overlap_threshold: 0.7
-    - name: contextual_recall
-      type: segment  # 上下文片段评估
-  report:
-    format: markdown  # 生成可视化报告
-    output_dir: ./anomaly_reports
-
-# 新增异常生成模式
-generation:
-  anomaly_simulation:
-    enable: true
-    strategy:
-      type: guided_diffusion  # 基于标注引导的异常生成
-      intensity: 0.15
-    reference_ranges:  # 引用标注中的典型异常模式
-      - channel: P-1
-        pattern: [[2149,2349], [4536,4844]]
-      - channel: S-1
-        pattern: [[5300,5747]]
-
-# 运行时配置增强
-runtime:
-  realtime_anomaly_alert:  # 实时异常检测功能
-    enable: true
-    sliding_window: 96  # 与模型seq_length对齐
-    confidence_threshold: 0.85
+    - name: point_anomaly_f1
+      type: pointwise
+      overlap: 0.5
+    - name: contextual_anomaly_auc
+      type: segment
+      min_overlap: 0.7
+  report_format: detailed_markdown
